@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Chụp ảnh thẻ 3x4</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%; width: 100%;
+    background: #f2f4f7; color: #1a1a1a;
+    font-family: -apple-system, Roboto, "Segoe UI", Arial, sans-serif;
+  }
+
+  /* ===== Trang chính (sáng màu): Bước 1 + Bước 2 ===== */
+  #page {
+    max-width: 480px; margin: 0 auto;
+    padding: 20px 16px 40px;
+  }
+  .app-title { font-size: 20px; font-weight: 700; text-align: center; margin: 8px 0 20px; }
+  .card {
+    background: #fff; border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    padding: 18px 16px; margin-bottom: 16px;
+  }
+  .step-label {
+    font-size: 13px; font-weight: 700; color: #1565c0;
+    text-transform: uppercase; letter-spacing: 0.03em;
+    margin-bottom: 10px;
+  }
+  select {
+    width: 100%; font-size: 16px; padding: 12px 14px;
+    border-radius: 10px; border: 1px solid #d7dbe0;
+    background: #fafbfc; color: #1a1a1a;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23555'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+  }
+  select:disabled { color: #999; background-color: #f0f1f3; }
+  .info-line { font-size: 13px; color: #666; margin-top: 10px; min-height: 18px; }
+  .badge-inline {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    background: #e8f5e9; color: #2e7d32; border-radius: 8px;
+    padding: 2px 8px; margin-left: 6px;
+  }
+  .chk-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; color: #555; margin-top: 12px;
+  }
+  .chk-row input { width: 18px; height: 18px; }
+
+  .btn {
+    font-size: 17px; font-weight: 700;
+    padding: 14px 24px; border-radius: 12px;
+    border: none; cursor: pointer; width: 100%;
+  }
+  .btn-primary { background: #2e7d32; color: #fff; }
+  .btn-primary:disabled { background: #b6c9b7; cursor: not-allowed; }
+  .btn-secondary { background: #eceff2; color: #333; }
+  .btn-row { display: flex; gap: 12px; }
+  .btn-row .btn { flex: 1; }
+  .empty-msg { color: #999; text-align: center; font-size: 13px; padding: 6px 0; }
+  .error-text { color: #c62828; text-align: center; font-size: 13px; padding: 6px 0; }
+
+  /* ===== Màn hình camera (nền tối, giữ nguyên vì đây là khung xem video) ===== */
+  .screen {
+    position: fixed; inset: 0; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: #111; color: #fff; padding: 20px; z-index: 10;
+  }
+  .screen.active { display: flex; }
+
+  #screen-camera { padding: 0; background: #000; }
+  #video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; background: #000;
+  }
+  #guideOverlay { position: absolute; pointer-events: none; }
+  #guideOverlay svg { width: 100%; height: 100%; display: block; }
+  #guideSizeLabel {
+    position: absolute; font-size: 12px; color: #fff;
+    background: rgba(0,0,0,0.55); padding: 3px 10px; border-radius: 10px;
+    pointer-events: none; white-space: nowrap;
+  }
+  .hint-top {
+    position: absolute; top: 14px; left: 0; right: 0;
+    text-align: center; font-size: 14px; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8); padding: 0 16px;
+  }
+  .hint-name {
+    position: absolute; top: 44px; left: 0; right: 0;
+    text-align: center; font-size: 13px; color: #ffd54f;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+  .cam-back {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(255,255,255,0.9); color: #222; border: none;
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600;
+  }
+  #captureBtn {
+    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+    width: 72px; height: 72px; border-radius: 50%;
+    background: #fff; border: 5px solid rgba(255,255,255,0.5);
+  }
+
+  /* ===== Preview / đang lưu / kết quả (sáng màu) ===== */
+  #screen-preview, #screen-saving, #screen-result {
+    background: #f2f4f7; color: #1a1a1a;
+  }
+  #screen-preview img, #canvasOut {
+    max-width: 80vw; max-height: 60vh;
+    border-radius: 10px; border: 1px solid #ddd; margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 4px solid #e0e0e0; border-top-color: #2e7d32;
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .msg-title { font-size: 19px; font-weight: 700; margin-bottom: 8px; text-align: center; }
+  .msg-sub { font-size: 14px; color: #555; margin-bottom: 24px; text-align: center; }
+  .error-box { color: #c62828; }
+  #screen-preview .btn-row, #screen-result .btn { max-width: 360px; }
+</style>
+</head>
+<body>
+
+  <!-- Trang chính: Bước 1 + Bước 2 -->
+  <div id="page">
+    <div class="app-title">📷 Chụp ảnh thẻ 3×4</div>
+
+    <div class="card">
+      <div class="step-label">Bước 1 · Chọn ngày</div>
+      <select id="dateSelect">
+        <option value="">— Đang tải danh sách ngày —</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div class="step-label">Bước 2 · Chọn người cần chụp</div>
+      <select id="nameSelect" disabled>
+        <option value="">— Chọn ngày trước —</option>
+      </select>
+      <div class="info-line" id="nameInfo"></div>
+      <label class="chk-row">
+        <input type="checkbox" id="includeDoneChk">
+        Hiện cả người đã có ảnh
+      </label>
+    </div>
+
+    <button class="btn btn-primary" id="startBtn" disabled onclick="startCamera()">Bắt đầu chụp ảnh</button>
+  </div>
+
+  <!-- Màn hình camera -->
+  <div class="screen" id="screen-camera">
+    <video id="video" autoplay playsinline muted></video>
+    <button class="cam-back" onclick="cancelCamera()">← Quay lại</button>
+    <div class="hint-top">Nhìn thẳng vào máy ảnh, căn đầu và vai theo đường kẻ xanh</div>
+    <div class="hint-name" id="hintName"></div>
+    <div id="guideOverlay">
+      <svg viewBox="0 0 300 400" preserveAspectRatio="none">
+        <rect x="2" y="2" width="296" height="396" fill="none" stroke="#ff3b30" stroke-width="4"/>
+        <line x1="150" y1="0" x2="150" y2="400" stroke="#2979ff" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <line x1="35" y1="150" x2="265" y2="150" stroke="#2979ff" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <line x1="0" y1="240" x2="300" y2="240" stroke="#2979ff" stroke-width="1.5" stroke-dasharray="5 5"/>
+        <ellipse cx="150" cy="150" rx="66" ry="95" fill="none" stroke="#2979ff" stroke-width="2.5"/>
+        <path d="M 95 220 Q 60 260 0 396" fill="none" stroke="#2979ff" stroke-width="2.5"/>
+        <path d="M 205 220 Q 240 260 300 396" fill="none" stroke="#2979ff" stroke-width="2.5"/>
+      </svg>
+    </div>
+    <div id="guideSizeLabel">Khổ 3 × 4 cm</div>
+    <button id="captureBtn" onclick="capturePhoto()"></button>
+  </div>
+
+  <!-- Preview -->
+  <div class="screen" id="screen-preview" style="align-items:center;">
+    <canvas id="canvasOut" style="display:none;"></canvas>
+    <img id="previewImg" alt="preview">
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="retake()">Chụp lại</button>
+      <button class="btn btn-primary" onclick="saveToDrive()">Lưu ảnh</button>
+    </div>
+  </div>
+
+  <!-- Đang lưu -->
+  <div class="screen" id="screen-saving" style="align-items:center;">
+    <div class="spinner"></div>
+    <div class="msg-title">Đang lưu ảnh lên Google Drive...</div>
+  </div>
+
+  <!-- Kết quả -->
+  <div class="screen" id="screen-result" style="align-items:center;">
+    <div class="msg-title" id="resultTitle"></div>
+    <div class="msg-sub" id="resultSub"></div>
+    <button class="btn btn-primary" onclick="backToPage()">Chụp ảnh khác</button>
+  </div>
+
+<script>
+  /**
+   * ===== CẤU HÌNH =====
+   * Dán URL Web App (kết thúc bằng /exec) sau khi deploy Apps Script (Code.gs) vào đây.
+   */
+  var APPS_SCRIPT_URL = 'DÁN_URL_APPS_SCRIPT_CỦA_BẠN_VÀO_ĐÂY';
+
+  var videoEl, stream;
+  var selectedDate = null, selectedRow = null, selectedName = null;
+  var croppedBase64 = '';
+
+  function showScreen(id) {
+    document.getElementById('page').style.display = 'none';
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    if (id) document.getElementById(id).classList.add('active');
+  }
+
+  function backToPage() {
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('page').style.display = 'block';
+  }
+
+  function apiUrlOk() {
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf('DÁN_URL') === 0) {
+      alert('Chưa cấu hình APPS_SCRIPT_URL trong file index.html.');
+      return false;
+    }
+    return true;
+  }
+
+  /* ---------- Bước 1: chọn ngày ---------- */
+  function loadDates() {
+    var sel = document.getElementById('dateSelect');
+    if (!apiUrlOk()) { sel.innerHTML = '<option value="">Chưa cấu hình API</option>'; return; }
+    sel.innerHTML = '<option value="">— Đang tải —</option>';
+    fetch(APPS_SCRIPT_URL + '?action=dates')
+      .then(function(r){ return r.json(); })
+      .then(function(list) {
+        if (list && list.success === false) {
+          sel.innerHTML = '<option value="">Lỗi: ' + list.error + '</option>';
+          return;
+        }
+        if (!list || !list.length) {
+          sel.innerHTML = '<option value="">Không có dữ liệu</option>';
+          return;
+        }
+        sel.innerHTML = '<option value="">— Chọn ngày —</option>';
+        list.forEach(function(d) {
+          var opt = document.createElement('option');
+          opt.value = d.value;
+          opt.textContent = d.label;
+          sel.appendChild(opt);
+        });
+      })
+      .catch(function(err) {
+        sel.innerHTML = '<option value="">Lỗi tải: ' + err.message + '</option>';
+      });
+  }
+
+  document.getElementById('dateSelect').addEventListener('change', function() {
+    selectedDate = this.value || null;
+    resetNameStep();
+    if (selectedDate) loadNames();
+  });
+
+  document.getElementById('includeDoneChk').addEventListener('change', function() {
+    if (selectedDate) loadNames();
+  });
+
+  function resetNameStep() {
+    selectedRow = null; selectedName = null;
+    var sel = document.getElementById('nameSelect');
+    sel.disabled = true;
+    sel.innerHTML = '<option value="">— Chọn ngày trước —</option>';
+    document.getElementById('nameInfo').textContent = '';
+    document.getElementById('startBtn').disabled = true;
+  }
+
+  /* ---------- Bước 2: chọn người ---------- */
+  function loadNames() {
+    var sel = document.getElementById('nameSelect');
+    var includeDone = document.getElementById('includeDoneChk').checked;
+    sel.disabled = true;
+    sel.innerHTML = '<option value="">— Đang tải —</option>';
+    fetch(APPS_SCRIPT_URL + '?action=names&date=' + encodeURIComponent(selectedDate) + '&includeDone=' + includeDone)
+      .then(function(r){ return r.json(); })
+      .then(function(list) {
+        if (list && list.success === false) {
+          sel.innerHTML = '<option value="">Lỗi: ' + list.error + '</option>';
+          return;
+        }
+        if (!list || !list.length) {
+          sel.innerHTML = '<option value="">Không có ai phù hợp</option>';
+          return;
+        }
+        sel.innerHTML = '<option value="">— Chọn người —</option>';
+        list.forEach(function(item) {
+          var opt = document.createElement('option');
+          opt.value = item.row;
+          opt.textContent = item.name + (item.hasPhoto ? ' (đã có ảnh)' : '');
+          opt.dataset.name = item.name;
+          opt.dataset.department = item.department || '';
+          opt.dataset.empCode = item.empCode || '';
+          opt.dataset.hasPhoto = item.hasPhoto ? '1' : '0';
+          sel.appendChild(opt);
+        });
+        sel.disabled = false;
+      })
+      .catch(function(err) {
+        sel.innerHTML = '<option value="">Lỗi tải: ' + err.message + '</option>';
+      });
+  }
+
+  document.getElementById('nameSelect').addEventListener('change', function() {
+    var opt = this.options[this.selectedIndex];
+    var infoEl = document.getElementById('nameInfo');
+    var startBtn = document.getElementById('startBtn');
+    if (!this.value) {
+      selectedRow = null; selectedName = null;
+      infoEl.textContent = '';
+      startBtn.disabled = true;
+      return;
+    }
+    selectedRow = this.value;
+    selectedName = opt.dataset.name;
+    var sub = [];
+    if (opt.dataset.department) sub.push(opt.dataset.department);
+    if (opt.dataset.empCode) sub.push('Mã: ' + opt.dataset.empCode);
+    infoEl.innerHTML = sub.join(' · ') + (opt.dataset.hasPhoto === '1' ? '<span class="badge-inline">Đã có ảnh — sẽ ghi đè</span>' : '');
+    startBtn.disabled = false;
+  });
+
+  /* ---------- Bước 3: camera ---------- */
+  function startCamera() {
+    showScreen('screen-camera');
+    document.getElementById('hintName').textContent = 'Đang chụp cho: ' + selectedName;
+    videoEl = document.getElementById('video');
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    }).then(function(s) {
+      stream = s;
+      videoEl.srcObject = s;
+      videoEl.onloadedmetadata = function() {
+        videoEl.play();
+        positionGuide();
+      };
+    }).catch(function(err) {
+      alert('Không thể mở camera: ' + err.message);
+      backToPage();
+    });
+    window.addEventListener('resize', positionGuide);
+  }
+
+  function cancelCamera() {
+    stopStream();
+    backToPage();
+  }
+
+  function positionGuide() {
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var guideH = vh * 0.72;
+    var guideW = guideH * 3 / 4;
+    if (guideW > vw * 0.88) {
+      guideW = vw * 0.88;
+      guideH = guideW * 4 / 3;
+    }
+    var left = (vw - guideW) / 2;
+    var top = (vh - guideH) / 2;
+
+    var g = document.getElementById('guideOverlay');
+    g.style.left = left + 'px';
+    g.style.top = top + 'px';
+    g.style.width = guideW + 'px';
+    g.style.height = guideH + 'px';
+
+    var label = document.getElementById('guideSizeLabel');
+    label.style.left = (left + guideW / 2) + 'px';
+    label.style.top = (top + guideH + 8) + 'px';
+    label.style.transform = 'translateX(-50%)';
+
+    window._guideRect = { left: left, top: top, width: guideW, height: guideH };
+  }
+
+  function capturePhoto() {
+    var vw = videoEl.clientWidth, vh = videoEl.clientHeight;
+    var nw = videoEl.videoWidth, nh = videoEl.videoHeight;
+    var scale = Math.max(vw / nw, vh / nh);
+
+    var visibleNativeW = vw / scale;
+    var visibleNativeH = vh / scale;
+    var visibleNativeX = (nw - visibleNativeW) / 2;
+    var visibleNativeY = (nh - visibleNativeH) / 2;
+
+    var rect = window._guideRect;
+    var srcX = visibleNativeX + rect.left / scale;
+    var srcY = visibleNativeY + rect.top / scale;
+    var srcW = rect.width / scale;
+    var srcH = rect.height / scale;
+
+    var outW = 900, outH = 1200;
+    var canvas = document.getElementById('canvasOut');
+    canvas.width = outW;
+    canvas.height = outH;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(videoEl, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    croppedBase64 = dataUrl.split(',')[1];
+    document.getElementById('previewImg').src = dataUrl;
+
+    stopStream();
+    showScreen('screen-preview');
+  }
+
+  function retake() {
+    showScreen('screen-camera');
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    }).then(function(s) {
+      stream = s;
+      videoEl.srcObject = s;
+      videoEl.onloadedmetadata = function() {
+        videoEl.play();
+        positionGuide();
+      };
+    }).catch(function(err) {
+      alert('Không thể mở camera: ' + err.message);
+      backToPage();
+    });
+  }
+
+  function stopStream() {
+    if (stream) {
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      stream = null;
+    }
+  }
+
+  /* ---------- Lưu ---------- */
+  function saveToDrive() {
+    if (!apiUrlOk()) return;
+    showScreen('screen-saving');
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'save',
+        row: selectedRow,
+        fullName: selectedName,
+        base64Data: croppedBase64
+      })
+    })
+      .then(function(res) { return res.json(); })
+      .then(onSaveSuccess)
+      .catch(onSaveError);
+  }
+
+  function onSaveSuccess(res) {
+    if (res && res.success) {
+      document.getElementById('resultTitle').textContent = '✅ Đã lưu ảnh thành công';
+      document.getElementById('resultSub').innerHTML =
+        'Người: ' + selectedName + '<br>Thư mục: ' + res.folderName;
+    } else {
+      document.getElementById('resultTitle').textContent = '❌ Lưu ảnh thất bại';
+      document.getElementById('resultTitle').classList.add('error-box');
+      document.getElementById('resultSub').textContent = (res && res.error) || 'Lỗi không xác định.';
+    }
+    showScreen('screen-result');
+  }
+
+  function onSaveError(err) {
+    document.getElementById('resultTitle').textContent = '❌ Lưu ảnh thất bại';
+    document.getElementById('resultTitle').classList.add('error-box');
+    document.getElementById('resultSub').textContent = err.message || String(err);
+    showScreen('screen-result');
+  }
+
+  loadDates();
+</script>
+</body>
+</html>
