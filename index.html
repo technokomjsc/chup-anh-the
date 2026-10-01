@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>CHỤP ẢNH THẺ TIẾP NHẬN NHÂN SỰ</title>
+<title>Chụp ảnh thẻ 3x4</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -194,7 +194,7 @@
   <div class="screen" id="screen-result" style="align-items:center;">
     <div class="msg-title" id="resultTitle"></div>
     <div class="msg-sub" id="resultSub"></div>
-    <button class="btn btn-primary" onclick="backToPage()">Chụp ảnh khác</button>
+    <button class="btn btn-primary" onclick="backToPageAfterSave()">Chụp ảnh khác</button>
   </div>
 
 <script>
@@ -217,6 +217,18 @@
   function backToPage() {
     document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
     document.getElementById('page').style.display = 'block';
+  }
+
+  // Dùng khi quay lại trang chính SAU KHI vừa lưu ảnh thành công:
+  // giữ nguyên ngày đã chọn ở Bước 1, nhưng tải lại Bước 2 và
+  // chỉ hiện người chưa có ảnh (bỏ chọn người cũ, bỏ tick "hiện cả người đã có ảnh").
+  function backToPageAfterSave() {
+    document.getElementById('includeDoneChk').checked = false;
+    selectedRow = null; selectedName = null;
+    document.getElementById('nameInfo').textContent = '';
+    document.getElementById('startBtn').disabled = true;
+    backToPage();
+    if (selectedDate) loadNames();
   }
 
   function apiUrlOk() {
